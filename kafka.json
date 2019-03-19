@@ -1,0 +1,242 @@
+{
+    "apiVersion": "v1",
+    "kind": "Template",
+    "metadata": {
+        "annotations": {
+            "description": "Setup for Kafka",
+            "iconClass": "icon-java",
+            "openshift.io/display-name": "Kafka",
+            "tags": "quickstart,instant-app,kafka",
+            "template.openshift.io/long-description": "This templates creates a Docker image with 2 container inside the same pod: One for zookeeper and the other one for kafka",
+            "template.openshift.io/provider-display-name": "Thibault Serot"
+        },
+        "name": "kafka"
+    },
+    "labels": {
+        "template": "kafka"
+    },
+    "objects": [
+
+
+        {
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${NAME}",
+                "annotations": {
+                    "description": "Exposes and load balances kafka and zookeeper"
+                },
+                "labels": {
+                    "app": "${NAME}"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "kafka",
+                        "port": 9092,
+                        "targetPort": 9092
+                    },
+                    {
+                        "name": "zookeeper",
+                        "port": 2181,
+                        "targetPort": 2181
+                    }
+                ],
+                "selector": {
+                    "name": "${NAME}",
+                    "app": "${NAME}"
+                }
+            }
+        },
+
+
+
+        {
+            "kind": "ImageStream",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${NAME}",
+                "labels": {
+                    "app": "${NAME}"
+                }
+            },
+            "spec": {
+            }
+        },
+        {
+            "kind": "BuildConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${NAME}",
+                "labels": {
+                    "app": "${NAME}"
+                }
+            },
+            "spec": {
+                "nodeSelector": {
+                },
+                "source": {
+                    "type": "Git",
+                    "git": {
+                        "uri": "${SOURCE_REPOSITORY_URL}",
+                        "ref": "${SOURCE_REPOSITORY_REF}"
+                    },
+                    "contextDir": "${CONTEXT_DIR}",
+                    "sourceSecret":{
+                        "name":"sshsecret"
+                    }
+                },
+                "strategy": {
+                    "type": "Docker"
+                },
+                "output": {
+                    "to": {
+                        "kind": "ImageStreamTag",
+                        "name": "${NAME}:latest"
+                    }
+                },
+                "triggers": [
+                    {
+                        "type": "ImageChange"
+                    },
+                    {
+                        "type": "ConfigChange"
+                    }
+                ]
+            },
+            "status": {
+                "lastVersion": 0
+
+            }
+        },
+
+
+        {
+            "kind": "DeploymentConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${NAME}",
+                "annotations": {
+                    "description": "Defines how to deploy the Kafka image"
+                },
+                "labels": {
+                    "app": "${NAME}"
+                }
+            },
+            "spec": {
+                "strategy": {
+                    "type": "Recreate"
+                },
+                "triggers": [
+                    {
+                        "type": "ImageChange",
+                        "imageChangeParams": {
+                            "automatic": true,
+                            "containerNames": [
+                                "kafka",
+                                "zookeeper"
+                            ],
+                            "from": {
+                                "kind": "ImageStreamTag",
+                                "name": "${NAME}:latest"
+                            }
+                        }
+                    },
+                    {
+                        "type": "ConfigChange"
+                    }
+                ],
+                "replicas": 1,
+                "selector": {
+                    "name": "${NAME}"
+                },
+                "template": {
+                    "metadata": {
+                        "name": "${NAME}",
+                        "labels": {
+                            "app": "${NAME}",
+                            "name": "${NAME}"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "kafka",
+                                "image": " ",
+                                "ports": [
+                                    {
+                                        "containerPort": 9092
+                                    }
+                                ],
+                                "command" : [ "/opt/kafka/bin/kafka-server-start.sh",
+                                    "/opt/kafka/config/server.properties",
+                                    "--override", "advertised.host.name=${NAME}" ],
+                                    "resources": {
+                                        "limits": {
+                                            "memory": "${KAFKA_MEMORY_LIMIT}"
+                                        }
+                                    }
+                            },
+                            {
+                                "name": "zookeeper",
+                                "image": " ",
+                                "ports": [
+                                    {
+                                        "containerPort": 2181
+                                    }
+                                ],
+                                "command" : [ "/opt/kafka/bin/zookeeper-server-start.sh",
+                                    "/opt/kafka/config/zookeeper.properties"],
+                                    "resources": {
+                                        "limits": {
+                                            "memory": "${ZOOKEEPER_MEMORY_LIMIT}"
+                                        }
+                                    }
+                            }
+
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "parameters": [
+        {
+            "description": "Name of the application",
+            "name": "NAME",
+            "required": true
+        },
+        {
+            "name": "KAFKA_MEMORY_LIMIT",
+            "displayName": "Memory Limit",
+            "required": true,
+            "description": "Maximum amount of memory the Kafka container can use.",
+            "value": "4Gi"
+        },
+        {
+            "name": "ZOOKEEPER_MEMORY_LIMIT",
+            "displayName": "Memory Limit",
+            "required": true,
+            "description": "Maximum amount of memory the Zookeeper container can use.",
+            "value": "2Gi"
+        },
+        {
+            "name": "SOURCE_REPOSITORY_REF",
+            "displayName": "Git Reference",
+            "description": "Set this to a branch name, tag or other ref of your repository if you are not using the default branch.",
+            "value": ""
+        },
+        {
+            "name": "CONTEXT_DIR",
+            "displayName": "Context Directory",
+            "description": "Set this to the relative path to your project if it is not in the root of your repository.",
+           
+        {
+            "name": "SOURCE_REPOSITORY_URL",
+            "description": "NOT USED IN THIS TEMPLATE",
+            "value": ""
+        }
+
+    ]
+}
